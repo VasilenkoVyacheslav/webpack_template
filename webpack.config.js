@@ -1,77 +1,108 @@
-const path = require('path');
-const webpack = require('webpack');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path = require("path");
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
+const ImageminPlugin = require('imagemin-webpack-plugin').default;
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 
-module.exports = {
-    mode: 'development',
-    entry: {
-        main: path.resolve(__dirname, './src/index.js'),
-    },
-
+const config = {
+    entry: ["./src/js/index.js", "./src/scss/main.scss"],
     output: {
-        path: path.resolve(__dirname, './dist'),
-        filename: 'js/[name].js',
-        assetModuleFilename: 'images/[name][ext][query]'
+        path: __dirname + '/dist',
+        filename: "js/main.min.js"
     },
-
-    plugins: [
-        new HtmlWebpackPlugin({
-            title: 'Webpack template',
-            template: path.resolve(__dirname, './src/template.html'),
-            filename: 'index.html',
-        }),
-        new CleanWebpackPlugin(),
-        new MiniCssExtractPlugin({
-            filename: "css/[name].css",
-        }),
-        new webpack.HotModuleReplacementPlugin()
-    ],
-
+    devtool: "source-map",
+    mode: "production",
+    optimization: {
+        minimizer: [
+            new TerserPlugin({
+                sourceMap: true,
+                extractComments: true
+            })
+        ]
+    },
     module: {
         rules: [
-            // JavaScript
             {
-                test: /\.js$/,
-                exclude: /node_modules/,
-                use: ['babel-loader'],
-            },
-
-            {
-                test: /\.(?:ico|gif|png|jpg|jpeg|svg)$/i,
-                type: 'asset/resource',
-                exclude: /fonts/
-            },
-
-            {
-                test: /\.(woff(2)?|eot|ttf|otf|svg|)$/,
-                type: 'asset/inline',
-                exclude: /images/
-            },
-
-            {
-                test: /\.(scss|css)$/,
+                test: /\.(sass|scss)$/,
+                include: path.resolve(__dirname, "./src/scss"),
                 use: [
                     {
                         loader: MiniCssExtractPlugin.loader,
                         options: {
-                            publicPath: "./",
-                        },
+                            publicPath: '../'
+                        }
                     },
-                    'css-loader', 'postcss-loader', 'sass-loader'
-                ],
+                    {
+                        loader: "css-loader",
+                        options: {
+                            sourceMap: true,
+                            url: true
+                        }
+                    },
+                    {
+                        loader: 'postcss-loader',
+                        options: {
+                            sourceMap: true,
+                            postcssOptions: {
+                                plugins: [['autoprefixer', { }]]
+                            }
+                        }
+                    },
+                    {
+                        loader: "sass-loader",
+                        options: {
+                            sourceMap: true
+                        }
+                    }
+                ]
             },
-        ],
+            {
+                test: /\.html$/,
+                use: {
+                    loader: "html-loader",
+                    options: {
+                        attrs: ['img:src','link:href','source:srcset']
+                    }
+                }
+            },
+            {
+                test: /\.(svg|png|jpg|eot|gif)$/,
+                use: {
+                    loader: "file-loader",
+                    options: {
+                        name: "[name].[ext]",
+                        outputPath: "./images"
+                    }
+                },
+            },
+        ]
     },
+    plugins: [
+        new MiniCssExtractPlugin({
+            filename: "css/style.css"
+        }),
+        new HtmlWebpackPlugin({
+            filename: './index.html',
+            template: "./src/index.html"
+        }),
+        new ImageminPlugin({
+            test: /\.(jpe?g|png|gif|svg)$/i,
+            pngquant: {
+                quality: '80'
+            },
+            jpegtran: {
+                quality: '80',
+                progressive: true
+            }
+        })
+    ]
+};
 
-    devServer: {
-        static: {
-            directory: path.join(__dirname, './dist'),
-        },
-        open: true,
-        hot: true,
-        compress: true,
-        port: 8080,
-    },
-}
+module.exports = (env, argv) => {
+    if (argv.mode === "production") {
+        config.plugins.push(new CleanWebpackPlugin());
+    }
+    return config;
+};
